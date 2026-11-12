@@ -8,6 +8,8 @@ import {
   Put,
   Query,
   UseInterceptors,
+  Post,
+  HttpCode,
 } from '@nestjs/common';
 import {
   LocGetResponse,
@@ -22,7 +24,18 @@ import { HttpInterceptor } from '../http.interceptor';
 export class LocationController {
   constructor(private readonly pspService: PSP) {}
 
+  @Post()
+  @HttpCode(201)
+  async createPost(
+    @Body() data: LocPutRequest,
+    @Headers() headers,
+  ): Promise<LocGetResponse> {
+    return this.create(data, headers);
+  }
+
+  /** Mantido por compatibilidade; a spec define POST /loc. */
   @Put()
+  @HttpCode(201)
   async create(
     @Body() data: LocPutRequest,
     @Headers() headers,

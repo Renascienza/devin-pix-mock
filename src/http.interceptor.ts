@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   CallHandler,
   ExecutionContext,
@@ -27,6 +28,7 @@ export class HttpInterceptor implements NestInterceptor {
     title,
     status,
     detail,
+    correlationId: randomUUID(),
     violacoes,
   });
 
@@ -168,13 +170,20 @@ export class HttpInterceptor implements NestInterceptor {
       title: 'Erro Interno do Servidor',
       status: 500,
       detail: 'Erro inesperado no servidor.',
+      correlationId: randomUUID(),
       violacoes: [],
     });
   }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<void> {
     const request = context.switchToHttp().getRequest();
-    const token = request.headers['mocked-token'];
+    const bearer = /^Bearer\s+(.+)$/i.exec(
+      String(request.headers['authorization'] || ''),
+    );
+    const token = request.headers['mocked-token'] || bearer?.[1];
+    const response = context.switchToHttp().getResponse();
+    const asProblem = () =>
+      response.setHeader?.('Content-Type', 'application/problem+json');
 
     const own = token ? owners.find((f) => f.token === token) : undefined;
 
@@ -195,10 +204,12 @@ export class HttpInterceptor implements NestInterceptor {
           }
         }),
         catchError((err: any): Observable<any> => {
+          asProblem();
           throw this.toProblem(err, request);
         }),
       );
     } else {
+      asProblem();
       return throwError(
         () => new UnauthorizedException(this.ServerErrorTypes[401]()),
       );

@@ -263,7 +263,7 @@ describe('COBV', () => {
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
           .send({ chave, valor, calendario, devedor })
           .set('mocked-token', '123-abc')
-          .expect(200)
+          .expect(201)
           .expect((res: any) =>
             expect(JSON.parse(res.text)).toMatchObject({
               chave,
@@ -319,7 +319,7 @@ describe('COBV', () => {
           .put(`/cobv/${txid}`)
           .send({ chave, valor, calendario, devedor })
           .set('mocked-token', '123-abc')
-          .expect(200);
+          .expect(201);
 
         await request(app.getHttpServer())
           .get(`/cobv/${txid}`)
@@ -340,7 +340,7 @@ describe('COBV', () => {
           .put(`/cobv/${txid}`)
           .send({ chave, valor, calendario, devedor })
           .set('mocked-token', '123-abc')
-          .expect(200);
+          .expect(201);
 
         valor.original = '2.00';
         await request(app.getHttpServer())
@@ -407,7 +407,7 @@ describe('COBV', () => {
         .put(`/cobv/${txid}`)
         .send({ chave, valor, calendario, devedor })
         .set('mocked-token', '123-abc')
-        .expect(200);
+        .expect(201);
     });
 
     describe('400', () => {
@@ -562,7 +562,7 @@ describe('COBV', () => {
     describe('404', () => {
       it('Não cadastrado', async () => {
         await request(app.getHttpServer())
-          .patch(`/cobv/${randomUUID()}`)
+          .patch(`/cobv/${randomUUID().replace(/-/g, '')}`)
           .send({ valor: { original: '2.00' } })
           .set('mocked-token', '123-abc')
           .expect(404);

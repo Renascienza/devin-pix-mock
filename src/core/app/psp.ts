@@ -1,3 +1,5 @@
+import { COLLECTIONS } from '../../app.factory';
+import { locationUrl, pixCopiaECola } from '../../libs/brcode';
 import { Injectable } from '@nestjs/common';
 import { MemoryDB } from '../../libs/fakedb';
 import {
@@ -52,18 +54,25 @@ export class PSP {
   private loccob: MemoryDB;
   private rec: MemoryDB;
 
+  private store(tipoCob: TipoCob): MemoryDB {
+    return tipoCob === TipoCob.vencimento ? this.cobV : this.cob;
+  }
+
   constructor() {
-    this.cob = MemoryDB.get('COB');
-    this.transHist = MemoryDB.get('COB_HIST');
+    this.cob = MemoryDB.ensure('COB', COLLECTIONS['COB']);
+    this.transHist = MemoryDB.ensure('COB_HIST', COLLECTIONS['COB_HIST']);
 
-    this.cobR = MemoryDB.get('COBR');
-    this.cobV = MemoryDB.get('COBV');
+    this.cobR = MemoryDB.ensure('COBR', COLLECTIONS['COBR']);
+    this.cobV = MemoryDB.ensure('COBV', COLLECTIONS['COBV']);
 
-    this.locations = MemoryDB.get('LOCATIONS');
-    this.correntistas = MemoryDB.get('CORRENTISTAS');
-    this.loccob = MemoryDB.get('LOC_COB');
+    this.locations = MemoryDB.ensure('LOCATIONS', COLLECTIONS['LOCATIONS']);
+    this.correntistas = MemoryDB.ensure(
+      'CORRENTISTAS',
+      COLLECTIONS['CORRENTISTAS'],
+    );
+    this.loccob = MemoryDB.ensure('LOC_COB', COLLECTIONS['LOC_COB']);
 
-    this.rec = MemoryDB.get('REC');
+    this.rec = MemoryDB.ensure('REC', COLLECTIONS['REC']);
   }
 
   private async joinLocCob(
@@ -129,16 +138,20 @@ export class PSP {
       criacao: new Date().toJSON(),
     };
 
-    if (await this.cob.read(itm.IdOwner, { txid: itm.txid })) {
+    if (await this.store(tipoCob).read(itm.IdOwner, { txid: itm.txid })) {
       throw new Error(`O campo txid ${itm.txid} já está em uso.`);
     }
 
     //INCLUI  LOCATION E TRANSAÇÃO, PARA DEPOIS VINCULÁ-LAS
     const { id } = await this.addLoc({ tipoCob, IdOwner: itm.IdOwner });
-    await this.cob.add(itm.IdOwner, curr);
+    await this.store(tipoCob).add(itm.IdOwner, curr);
     await this.joinLocCob(itm.IdOwner, itm.txid, id, tipoCob);
 
-    return await this._readCob({ IdOwner: itm.IdOwner, txid: itm.txid });
+    return await this._readCob(
+      { IdOwner: itm.IdOwner, txid: itm.txid },
+      undefined,
+      tipoCob,
+    );
   }
 
   async addCob(itm: PixRequest<CobPutRequest>): Promise<CobPutResponse> {
@@ -155,15 +168,27 @@ export class PSP {
 
   async _readCob<T extends CobGetResponse | CobVGetResponse>(
     key: PixKey,
-    revisao?: number,
+    revisao?: number | string,
+    tipoCob: TipoCob = TipoCob.imediato,
   ): Promise<T> {
-    const last = () => this.cob.read(key.IdOwner, { txid: key.txid });
-    const hist = () =>
-      this.transHist.read(key.IdOwner, { id: getMD5Hash(key.txid, revisao) });
-
-    const curr = revisao ? (await hist()) || (await last()) : await last();
-    if (!curr) {
+    const rev =
+      revisao === undefined || revisao === null || revisao === ''
+        ? undefined
+        : Number(revisao);
+    const last = await this.store(tipoCob).read(key.IdOwner, {
+      txid: key.txid,
+    });
+    if (!last) {
       return undefined;
+    }
+    let curr = last;
+    if (rev !== undefined && rev !== last.revisao) {
+      curr = await this.transHist.read(key.IdOwner, {
+        id: getMD5Hash(`${tipoCob}:${key.txid}`, rev),
+      });
+      if (!curr) {
+        return undefined;
+      }
     }
 
     const c = await this.correntistas.read('DEV', { chave: curr.chave });
@@ -172,116 +197,151 @@ export class PSP {
     }
 
     const loccob = await this.loccob.read(key.IdOwner, { txid: curr.txid });
-    let loc: LocGetResponse = undefined;
-
+    let loc: any = undefined;
     if (loccob) {
-      loc = await this.locations.read(key.IdOwner, { id: loccob.id });
-      if (!loc) {
+      const l = await this.locations.read(key.IdOwner, { id: loccob.id });
+      if (!l) {
         throw new Error(MESSAGES.Errors.defaults.NOT_FOUNT('Location'));
       }
-      loc.location = `pix.example.com/qr/${loc.uuid}`;
+      loc = {
+        id: l.id,
+        location: locationUrl(l.uuid),
+        tipoCob: l.tipoCob,
+        criacao: l.criacao,
+      };
     }
 
-    const res = {
-      ...curr,
-      loc: loc,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _histId, IdOwner: _owner, ...data } = curr;
+    const res: any = {
+      ...data,
+      calendario: { ...(curr.calendario || {}), criacao: curr.criacao },
+      loc,
       location: loc?.location,
+      pixCopiaECola:
+        loc && curr.status === Situacao.Ativa
+          ? pixCopiaECola({
+              location: loc.location,
+              nome: c.nome,
+              cidade: c.Cidade,
+            })
+          : undefined,
+      pix: curr.pix || [],
     };
-
+    if (tipoCob === TipoCob.vencimento) {
+      const doc = String(c.cpfcnpj || '');
+      res.recebedor = {
+        nome: c.nome,
+        ...(doc.length === 11 ? { cpf: doc } : { cnpj: doc }),
+        cidade: c.Cidade,
+      };
+    }
     return res;
   }
 
   async readCob(key: PixKey, revisao?: number): Promise<CobGetResponse> {
-    return await this._readCob(key, revisao);
+    return await this._readCob(key, revisao, TipoCob.imediato);
   }
 
   async readCobV(key: PixKey, revisao?: number): Promise<CobVGetResponse> {
-    return await this._readCob(key, revisao);
+    return await this._readCob(key, revisao, TipoCob.vencimento);
   }
 
   async _listCob(
-    filter: (CobGetFilter | CobVGetFilter) & { IdOwner: string },
+    filter: any,
+    tipoCob: TipoCob = TipoCob.imediato,
   ): Promise<IPaginator & { cobs: (CobGetResponse | CobVGetResponse)[] }> {
-    const res: IPaginator = {
+    const num = (v: any, def: number) =>
+      v === undefined || v === '' ? def : Number(v);
+    const pag = filter.paginacao || {};
+    const paginaAtual = num(
+      filter['paginacao.paginaAtual'] ?? pag.paginaAtual,
+      0,
+    );
+    const itensPorPagina = num(
+      filter['paginacao.itensPorPagina'] ?? pag.itensPorPagina,
+      100,
+    );
+    if (
+      !filter.inicio ||
+      !filter.fim ||
+      isNaN(Date.parse(filter.inicio)) ||
+      isNaN(Date.parse(filter.fim))
+    ) {
+      throw new Error(
+        'Os parâmetros inicio e fim são obrigatórios e devem respeitar o formato RFC 3339.',
+      );
+    }
+    if (
+      !Number.isInteger(paginaAtual) ||
+      paginaAtual < 0 ||
+      !Number.isInteger(itensPorPagina) ||
+      itensPorPagina < 1 ||
+      itensPorPagina > 1000
+    ) {
+      throw new Error('Os parâmetros de paginação não respeitam o schema.');
+    }
+    const [inicio, fim] = [new Date(filter.inicio), new Date(filter.fim)];
+    const locationPresente =
+      filter.locationPresente === undefined
+        ? undefined
+        : String(filter.locationPresente) === 'true';
+
+    const ls = await this.store(tipoCob).list(filter.IdOwner);
+    let cobs = await Promise.all(
+      ls
+        .filter((f: any) => {
+          const criacao = new Date(f.criacao);
+          return (
+            criacao >= inicio &&
+            criacao <= fim &&
+            (!filter.cpf || f.devedor?.cpf === filter.cpf) &&
+            (!filter.cnpj || f.devedor?.cnpj === filter.cnpj) &&
+            (!filter.status || f.status === filter.status)
+          );
+        })
+        .map((m) =>
+          this._readCob(
+            { IdOwner: filter.IdOwner, txid: m.txid },
+            undefined,
+            tipoCob,
+          ),
+        ),
+    );
+    if (locationPresente !== undefined) {
+      cobs = cobs.filter((f: any) => !!f.loc?.id === locationPresente);
+    }
+    const ini = paginaAtual * itensPorPagina;
+    return {
       parametros: {
         inicio: filter.inicio,
         fim: filter.fim,
         paginacao: {
-          paginaAtual: filter.paginacao?.paginaAtual || 0,
-          itensPorPagina: filter.paginacao?.itensPorPagina || 100,
-          quantidadeDePaginas: 0,
-          quantidadeTotalDeItens: 0,
+          paginaAtual,
+          itensPorPagina,
+          quantidadeDePaginas: Math.ceil(cobs.length / itensPorPagina),
+          quantidadeTotalDeItens: cobs.length,
         },
       },
+      cobs: cobs.slice(ini, ini + itensPorPagina) as any,
     };
-
-    let chave: string = undefined;
-
-    if (filter.cnpj || filter.cpf) {
-      const correntista = await this.correntistas.read('DEV', {
-        cpfcnpj: filter.cnpj || filter.cpf,
-      });
-
-      //CORRENTISTA NÃO ENCONTRADO RETORNA LISTA VAZIA
-      if (!correntista) {
-        return { ...res, cobs: [] };
-      } else {
-        chave = correntista.chave;
-      }
-    }
-
-    const ls = await this.cob.list(filter.IdOwner);
-
-    let cobs = await Promise.all(
-      ls
-        .filter((f: any) => {
-          const [criacao, inicio, fim] = [
-            new Date(f.criacao),
-            new Date(filter.inicio),
-            new Date(filter.fim),
-          ];
-          return (
-            criacao >= inicio && criacao <= fim && (!chave || f.chave === chave)
-          );
-        })
-        .map<Promise<CobGetResponse | CobVGetResponse>>((m) =>
-          this._readCob({ IdOwner: filter.IdOwner, txid: m.txid }),
-        ),
-    );
-
-    if (filter.locationPresente !== undefined) {
-      cobs = cobs.filter((f: CobGetResponse) => {
-        const res =
-          (!!f.loc?.id && !!filter.locationPresente) ||
-          (!f.loc?.id && !filter.locationPresente);
-        return res;
-      });
-    }
-
-    const ini =
-      res.parametros.paginacao.paginaAtual *
-      res.parametros.paginacao.itensPorPagina;
-    const fim = ini + res.parametros.paginacao.itensPorPagina;
-    res.parametros.paginacao.quantidadeDePaginas = Math.ceil(
-      cobs.length / res.parametros.paginacao.itensPorPagina,
-    );
-    res.parametros.paginacao.quantidadeTotalDeItens = cobs.length;
-    return { ...res, cobs: cobs.slice(ini, fim) };
   }
 
   async listCob(filter: CobGetFilter & { IdOwner: string }) {
-    return await this._listCob(filter);
+    return await this._listCob(filter, TipoCob.imediato);
   }
 
   async listCobV(filter: CobVGetFilter & { IdOwner: string }) {
-    return await this._listCob(filter);
+    return await this._listCob(filter, TipoCob.vencimento);
   }
 
   async _editCob(
     itm: PixRequest<CobPatchRequest | CobVPatchRequest>,
     tipoCob: TipoCob,
   ) {
-    const curr = await this._readCob(itm);
+    const curr = await this.store(tipoCob).read(itm.IdOwner, {
+      txid: itm.txid,
+    });
     let add = false;
 
     if (!curr || curr.status != Situacao.Ativa) {
@@ -320,7 +380,7 @@ export class PSP {
         }
       }
 
-      const histId = getMD5Hash(curr.txid, curr.revisao);
+      const histId = getMD5Hash(`${tipoCob}:${curr.txid}`, curr.revisao);
       if (add) {
         await this.transHist.add(itm.IdOwner, { id: histId, ...curr });
         curr.revisao++;
@@ -345,20 +405,18 @@ export class PSP {
           } as CobVValor;
         }
 
-        await this.cob.update(
+        await this.store(tipoCob).update(
           itm.IdOwner,
           { txid: itm.txid },
           { ...curr, ...itm.data },
         );
-      } else {
-        await this.cob.patch(
-          itm.IdOwner,
-          { txid: itm.txid },
-          { loc: curr.loc },
-        );
       }
 
-      return await this._readCob({ IdOwner: itm.IdOwner, txid: itm.txid });
+      return await this._readCob(
+        { IdOwner: itm.IdOwner, txid: itm.txid },
+        undefined,
+        tipoCob,
+      );
     }
   }
 
@@ -372,15 +430,18 @@ export class PSP {
     return (await this._editCob(itm, TipoCob.vencimento)) as CobVPatchResponse;
   }
 
-  async _removeCob(key: PixID & { IdOwner: string }): Promise<boolean> {
+  async _removeCob(
+    key: PixID & { IdOwner: string },
+    tipoCob: TipoCob = TipoCob.imediato,
+  ): Promise<boolean> {
     await this.loccob.remove(key.IdOwner, { txid: key.txid });
-    return await this.cob.remove(key.IdOwner, { txid: key.txid });
+    return await this.store(tipoCob).remove(key.IdOwner, { txid: key.txid });
   }
   async removeCob(key: PixID & { IdOwner: string }): Promise<boolean> {
     return this._removeCob(key);
   }
   async removeCobV(key: PixID & { IdOwner: string }): Promise<boolean> {
-    return this._removeCob(key);
+    return this._removeCob(key, TipoCob.vencimento);
   }
 
   async readLoc({
@@ -393,7 +454,7 @@ export class PSP {
       return {
         ...itm,
         ...(lc?.txid ? { txid: lc?.txid } : {}),
-        location: `pix.example.com/qr/${itm.uuid}`,
+        location: locationUrl(itm.uuid),
       };
     }
   }
@@ -427,7 +488,7 @@ export class PSP {
       return _locs.map((m) => {
         const _cob = _cobs.find((f) => f.id === m.id);
         return _cob
-          ? { ...m, txid: _cob.txid, location: `pix.example.com/qr/${m.uuid}` }
+          ? { ...m, txid: _cob.txid, location: locationUrl(m.uuid) }
           : m;
       });
     });
@@ -468,7 +529,7 @@ export class PSP {
       return {
         ...itm,
         txid: lc?.txid,
-        location: `pix.example.com/qr/${itm.uuid}`,
+        location: locationUrl(itm.uuid),
       };
     }
   }

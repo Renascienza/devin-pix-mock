@@ -1,3 +1,4 @@
+import { TxidPipe, RevisaoPipe } from '../validators/pipes';
 import {
   Body,
   Controller,
@@ -9,6 +10,7 @@ import {
   Put,
   Query,
   UseInterceptors,
+  HttpCode,
 } from '@nestjs/common';
 import { PSP } from '../core/app/psp';
 import { HttpInterceptor } from '../http.interceptor';
@@ -26,9 +28,10 @@ export class CobController {
   constructor(private readonly pspService: PSP) {}
 
   @Put(':txid')
+  @HttpCode(201)
   async add(
     @Body() data: CobPutRequest,
-    @Param('txid') txid,
+    @Param('txid', new TxidPipe()) txid,
     @Headers() headers,
   ) {
     const IdOwner = headers['IdOwner'];
@@ -45,9 +48,13 @@ export class CobController {
   }
 
   @Get(':txid')
-  async read(@Param('txid') txid, @Headers() headers, @Query() qry?) {
+  async read(
+    @Param('txid', new TxidPipe()) txid,
+    @Headers() headers,
+    @Query('revisao', new RevisaoPipe()) revisao?: number,
+  ) {
     const IdOwner = headers['IdOwner'];
-    const itm = await this.pspService.readCob({ IdOwner, txid }, qry?.revisao);
+    const itm = await this.pspService.readCob({ IdOwner, txid }, revisao);
     return itm;
   }
 
@@ -58,7 +65,11 @@ export class CobController {
   }
 
   @Patch(':txid')
-  edit(@Body() data: CobPatchRequest, @Param('txid') txid, @Headers() headers) {
+  edit(
+    @Body() data: CobPatchRequest,
+    @Param('txid', new TxidPipe()) txid,
+    @Headers() headers,
+  ) {
     const IdOwner = headers['IdOwner'];
     const itm: PixRequest<CobPatchRequest> = { IdOwner, txid, data };
     return this.pspService.editCob(itm);

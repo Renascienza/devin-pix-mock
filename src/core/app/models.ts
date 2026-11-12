@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   MaxLength,
   Min,
+  IsInt,
 } from 'class-validator';
 import {
   IsCNPJValid,
@@ -51,6 +52,7 @@ export interface ICriacao {
 }
 
 export class Expiracao {
+  @IsInt({ message: 'O campo $$ não respeita o schema.' })
   @Min(1, { message: 'O campo $$ é igual ou menor que zero.' })
   expiracao: number;
 }
@@ -90,6 +92,15 @@ export class Pessoa extends DadosPessoa {
   cpf?: string;
 }
 
+export class InfoAdicional {
+  @IsNotEmpty({ message: 'O campo $$ não respeita o schema.' })
+  @MaxLength(50, { message: 'O campo $$ não respeita o schema.' })
+  nome: string;
+  @IsNotEmpty({ message: 'O campo $$ não respeita o schema.' })
+  @MaxLength(200, { message: 'O campo $$ não respeita o schema.' })
+  valor: string;
+}
+
 export interface IInfoAdicional {
   nome: string;
   valor: string;
@@ -100,6 +111,7 @@ export enum Situacao {
   Ativa = 'ATIVA',
   Concluida = 'CONCLUIDA',
   RemovidaPSP = 'REMOVIDA_PELO_PSP',
+  RemovidaPSPBoleto = 'REMOVIDA_PELO_PSP_BOLETO',
 }
 
 export enum ModalidadeMulta {

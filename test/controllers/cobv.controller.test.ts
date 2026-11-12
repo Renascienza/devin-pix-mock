@@ -126,7 +126,20 @@ describe('CobVController', () => {
         for (let i = 0; i < FILL_TEST; i++) {
           txid = randomUUID().replace(/\-/g, '');
           lsPix.push(
-            await ctrl.create({ chave: c.chave, valor }, txid, { IdOwner }),
+            await ctrl.create(
+              {
+                chave: c.chave,
+                valor,
+                devedor: {
+                  nome: c.nome,
+                  ...(c.cpfcnpj.length === 11
+                    ? { cpf: c.cpfcnpj }
+                    : { cnpj: c.cpfcnpj }),
+                } as any,
+              },
+              txid,
+              { IdOwner },
+            ),
           );
         }
       }
@@ -153,7 +166,7 @@ describe('CobVController', () => {
       });
     });
 
-    describe('CORRENTISTA - CPF', () => {
+    describe('DEVEDOR - CPF', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),
@@ -175,7 +188,7 @@ describe('CobVController', () => {
       });
     });
 
-    describe('CORRENTISTA - CNPJ', () => {
+    describe('DEVEDOR - CNPJ', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),
@@ -197,7 +210,7 @@ describe('CobVController', () => {
       });
     });
 
-    describe('CORRENTISTA - CPF INEXISTENTE', () => {
+    describe('DEVEDOR - CPF INEXISTENTE', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),

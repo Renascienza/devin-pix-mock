@@ -19,7 +19,7 @@ Referências: *Discovery — devin-pix-mock* e *Análise de aderência à especi
 |---|---|---|
 | G0 | Estabilização | Concluído |
 | G1 | CI e higiene | Concluído |
-| G2 | Conformidade Cob/CobV/Loc | Em andamento |
+| G2 | Conformidade Cob/CobV/Loc | Concluído |
 | G3 | Pagamento, Pix, devolução, webhooks, payload location | Pendente |
 | G4 | Pix Automático (Rec, SolicRec, LocRec, CobR) e LoteCobV | Pendente |
 | G5 | Operação e DX | Pendente |
@@ -69,4 +69,26 @@ Outros ajustes:
 - `CobRController.create` passa a delegar para `PSP.addCobR` (a implementação real vem no G4).
 
 **Evidências G1:** lint sem problemas, format ok, build ok, 258 testes passando com Nest 11; smoke no servidor real (POST /cob 201, listagem 200, /api-docs 200).
+
+### G2 — Conformidade Cob/CobV/Loc (concluído)
+
+Implementado:
+- `src/libs/brcode.ts`: gera o `pixCopiaECola` (BR Code dinâmico EMV, CRC16-CCITT) e a URL da location (`PIX_LOCATION_HOST`).
+- `PSP`: coleção própria para CobV (`COBV`); `_readCob` devolve `calendario.criacao`, `loc` {id, location, tipoCob, criacao}, `pixCopiaECola`, `pix[]` e, na CobV, `recebedor`. `revisao=0` funciona; revisão inexistente → 404.
+- Listagens: `paginacao.paginaAtual` e `paginacao.itensPorPagina` respeitados; filtros `status`, `locationPresente` ("true"/"false") e `cpf`/`cnpj` **do devedor**, conforme a spec; `inicio`/`fim` obrigatórios → 400.
+- `TxidPipe` (`^[a-zA-Z0-9]{26,35}$`) e `RevisaoPipe` nas rotas; PUT de cob/cobv → **201**; `POST /loc` (201), mantendo o `PUT /loc` legado.
+- Validações: `valor.original` com `^\d{1,10}\.\d{2}$`; `solicitacaoPagador` ≤ 140; `infoAdicionais` ≤ 50 itens (nome ≤ 50, valor ≤ 200); `expiracao` inteiro.
+- Erros com `correlationId` e `Content-Type: application/problem+json`; `Authorization: Bearer <token>` aceito ao lado do `mocked-token`.
+- Auth: `POST /oauth/token` (OAuth2 client credentials, JSON/form, Basic) retorna `access_token`, `token_type`, `expires_in` e `scope`; atraso configurável por `AUTH_DELAY_MS`.
+
+- Enum `Situacao` ganhou `REMOVIDA_PELO_PSP_BOLETO` (status de CobV da 2.11).
+- Erros HTTP passam por `ProblemJsonFilter` (`src/app.factory.ts`), que responde com `application/problem+json`.
+- Testes: os existentes foram ajustados (PUT → 201, txid válido nos 404, filtro de CPF/CNPJ pelo devedor) e foi criado `test/contrato.e2e.test.ts`, que sobe o app configurado como em produção e testa OAuth2, Bearer, BR Code/CRC, problem+json, patterns, revisões, paginação, CobV separada e `POST /loc`.
+
+Evidências:
+- `npx jest --coverage=false`: 16 suítes e 269 testes passando.
+- `npm run lint:check`, `npm run format:check` e `npx nest build`: OK.
+- Smoke no servidor real (`node dist/main.js`): `POST /oauth/token` (Basic) → `access_token`; `PUT /cob` com Bearer → 201, com `calendario.criacao` e `pixCopiaECola`; `PUT /cob/abc` → 400 `application/problem+json`; `POST /loc` → 201.
+
+Ficaram para os próximos gates: escopos OAuth por rota e expiração automática (G3), CNPJ alfanumérico e mTLS opcional (G5).
 

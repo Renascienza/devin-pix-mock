@@ -10,4 +10,6 @@ export class ValidateInput {
   client_id: string;
   @ApiProperty({ description: 'Senha do assinante', example: 'aaa' })
   client_secret: string;
+  @ApiProperty({ description: 'Escopos solicitados', required: false })
+  scope?: string;
 }

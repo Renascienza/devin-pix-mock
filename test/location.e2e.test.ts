@@ -121,7 +121,7 @@ describe('LOC', () => {
           .put(`/loc`)
           .send({ IdOwner, tipoCob: TipoCob.imediato })
           .set('mocked-token', '123-abc')
-          .expect(200);
+          .expect(201);
       });
 
       it('Vencimento', async () => {
@@ -129,7 +129,7 @@ describe('LOC', () => {
           .put(`/loc`)
           .send({ IdOwner, tipoCob: TipoCob.vencimento })
           .set('mocked-token', '123-abc')
-          .expect(200);
+          .expect(201);
       });
     });
   });
@@ -164,7 +164,7 @@ describe('LOC', () => {
         await request(app.getHttpServer())
           .put(`/loc`)
           .set('mocked-token', '123-abc')
-          .expect(200)
+          .expect(201)
           .then((v) => (itm = v.body));
 
         await request(app.getHttpServer())
@@ -182,7 +182,7 @@ describe('LOC', () => {
           .put(`/cob/${randomUUID().replace(/\-/g, '')}`)
           .send({ chave, valor: { original: '1.00' } })
           .set('mocked-token', '123-abc')
-          .expect(200)
+          .expect(201)
           .then((v) => (itm = v.body));
 
         await request(app.getHttpServer())
@@ -231,7 +231,7 @@ describe('LOC', () => {
           .put(`/cob/${randomUUID().replace(/\-/g, '')}`)
           .send({ chave, valor: { original: '1.00' } })
           .set('mocked-token', '123-abc')
-          .expect(200)
+          .expect(201)
           .then((v) => (itm = v.body));
 
         await request(app.getHttpServer())

@@ -3,6 +3,10 @@ import {
   INestApplication,
   ValidationError,
   ValidationPipe,
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
 } from '@nestjs/common';
 import { MemoryDB } from './libs/fakedb';
 import { correntistas } from './data/db.json';
@@ -52,7 +56,21 @@ export const formatValidationErrors = (
   return message;
 };
 
+@Catch(HttpException)
+export class ProblemJsonFilter implements ExceptionFilter {
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const body: any = exception.getResponse();
+    host
+      .switchToHttp()
+      .getResponse()
+      .status(exception.getStatus())
+      .type(body?.type ? 'application/problem+json' : 'application/json')
+      .send(JSON.stringify(body));
+  }
+}
+
 export function configureApp(app: INestApplication): INestApplication {
+  app.useGlobalFilters(new ProblemJsonFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,

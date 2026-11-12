@@ -119,6 +119,12 @@ describe('CobController', () => {
             await ctrl.add(
               {
                 chave: c.chave,
+                devedor: {
+                  nome: c.nome,
+                  ...(c.cpfcnpj.length === 11
+                    ? { cpf: c.cpfcnpj }
+                    : { cnpj: c.cpfcnpj }),
+                } as any,
                 valor: {
                   original: (Math.floor(Math.random() * 1000) * 1.53).toFixed(
                     2,
@@ -154,7 +160,7 @@ describe('CobController', () => {
       });
     });
 
-    describe('CORRENTISTA - CPF', () => {
+    describe('DEVEDOR - CPF', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),
@@ -176,7 +182,7 @@ describe('CobController', () => {
       });
     });
 
-    describe('CORRENTISTA - CNPJ', () => {
+    describe('DEVEDOR - CNPJ', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),
@@ -198,7 +204,7 @@ describe('CobController', () => {
       });
     });
 
-    describe('CORRENTISTA - CPF INEXISTENTE', () => {
+    describe('DEVEDOR - CPF INEXISTENTE', () => {
       const filter: CobGetFilter = {
         inicio: flatDate(addDays(new Date(), -1)).toJSON(),
         fim: flatDate(addDays(new Date(), +1)).toJSON(),

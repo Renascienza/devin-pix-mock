@@ -2,8 +2,13 @@ import {
   IsDefined,
   IsNotEmpty,
   IsNotEmptyObject,
-  IsNumberString,
   ValidateNested,
+  Matches,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import {
   Chave,
@@ -15,6 +20,7 @@ import {
   ModalidadeAlteracao,
   Situacao,
   PixRevisao,
+  InfoAdicional,
 } from '../models';
 import { Type } from 'class-transformer';
 import { IntersectionType } from '@nestjs/swagger';
@@ -31,7 +37,9 @@ import { LocID, LocGetRequest } from './loc';
 Todos os campos que indicam valores monetários obedecem ao pattern \d{1,10}.\d{2}. O separador decimal é o caractere ponto. Não é aplicável utilizar separador de milhar. Exemplos de valores aderentes ao padrão: “1.00”, “123.99”, “123456789.23" */
 export class Valor {
   @IsNotEmpty({ message: 'O campo $$ não respeita o schema.' })
-  @IsNumberString({}, { message: 'O campo $$ não respeita o schema.' })
+  @Matches(/^\d{1,10}\.\d{2}$/, {
+    message: 'O campo $$ não respeita o schema.',
+  })
   @MinStringNumber(0.01, { message: 'O campo $$ é zero.' })
   original: string;
 }
@@ -55,7 +63,15 @@ export class CobGetResponse implements Chave, PixID, PixRevisao {
   status: Situacao;
   devedor: Pessoa;
   valor: Valor & Alteracao & Retirada;
+  @IsOptional()
+  @IsString({ message: 'O campo $$ não respeita o schema.' })
+  @MaxLength(140, { message: 'O campo $$ não respeita o schema.' })
   solicitacaoPagador: string;
+  @IsOptional()
+  @IsArray({ message: 'O campo $$ não respeita o schema.' })
+  @ArrayMaxSize(50, { message: 'O campo $$ não respeita o schema.' })
+  @ValidateNested({ each: true })
+  @Type(() => InfoAdicional)
   infoAdicionais: IInfoAdicional[];
 }
 
@@ -85,7 +101,15 @@ export class CobPutRequest {
   @ValidateNested()
   @Type(() => Pessoa)
   devedor?: Pessoa;
+  @IsOptional()
+  @IsString({ message: 'O campo $$ não respeita o schema.' })
+  @MaxLength(140, { message: 'O campo $$ não respeita o schema.' })
   solicitacaoPagador?: string;
+  @IsOptional()
+  @IsArray({ message: 'O campo $$ não respeita o schema.' })
+  @ArrayMaxSize(50, { message: 'O campo $$ não respeita o schema.' })
+  @ValidateNested({ each: true })
+  @Type(() => InfoAdicional)
   infoAdicionais?: IInfoAdicional[];
 }
 
@@ -102,6 +126,9 @@ export class CobPatchRequest {
   @ValidateNested({})
   @Type(() => Pessoa)
   devedor?: Pessoa;
+  @IsOptional()
+  @IsString({ message: 'O campo $$ não respeita o schema.' })
+  @MaxLength(140, { message: 'O campo $$ não respeita o schema.' })
   solicitacaoPagador?: string;
   status?: 'REMOVIDA_PELO_USUARIO_RECEBEDOR';
 }
