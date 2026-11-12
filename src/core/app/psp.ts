@@ -1,3 +1,4 @@
+import { toPixOut } from './models/pix-out';
 import { COLLECTIONS } from '../../app.factory';
 import { locationUrl, pixCopiaECola } from '../../libs/brcode';
 import { Injectable } from '@nestjs/common';
@@ -53,6 +54,14 @@ export class PSP {
   private correntistas: MemoryDB;
   private loccob: MemoryDB;
   private rec: MemoryDB;
+
+  private async pixDe(IdOwner: string, refs: string[] = []) {
+    const pixDb = MemoryDB.ensure('PIX', COLLECTIONS['PIX']);
+    const ls = await Promise.all(
+      refs.map((endToEndId) => pixDb.read(IdOwner, { endToEndId })),
+    );
+    return ls.filter(Boolean).map(toPixOut);
+  }
 
   private store(tipoCob: TipoCob): MemoryDB {
     return tipoCob === TipoCob.vencimento ? this.cobV : this.cob;
@@ -226,7 +235,7 @@ export class PSP {
               cidade: c.Cidade,
             })
           : undefined,
-      pix: curr.pix || [],
+      pix: await this.pixDe(key.IdOwner, curr.pix),
     };
     if (tipoCob === TipoCob.vencimento) {
       const doc = String(c.cpfcnpj || '');

@@ -20,7 +20,7 @@ Referências: *Discovery — devin-pix-mock* e *Análise de aderência à especi
 | G0 | Estabilização | Concluído |
 | G1 | CI e higiene | Concluído |
 | G2 | Conformidade Cob/CobV/Loc | Concluído |
-| G3 | Pagamento, Pix, devolução, webhooks, payload location | Pendente |
+| G3 | Pagamento, Pix, devolução, webhooks, payload location | Concluído |
 | G4 | Pix Automático (Rec, SolicRec, LocRec, CobR) e LoteCobV | Pendente |
 | G5 | Operação e DX | Pendente |
 
@@ -91,4 +91,19 @@ Evidências:
 - Smoke no servidor real (`node dist/main.js`): `POST /oauth/token` (Basic) → `access_token`; `PUT /cob` com Bearer → 201, com `calendario.criacao` e `pixCopiaECola`; `PUT /cob/abc` → 400 `application/problem+json`; `POST /loc` → 201.
 
 Ficaram para os próximos gates: escopos OAuth por rota e expiração automática (G3), CNPJ alfanumérico e mTLS opcional (G5).
+
+### G3 — Pagamento, Pix recebidos, devolução, webhooks e Payload Location (concluído)
+
+Implementado (`src/core/app/pix.service.ts` e os controllers `pix`, `webhook` e `mock`):
+- **Simulação de pagamento** (fora da spec, sob `/mock`): `POST /mock/cob/:txid/pagamento` e `POST /mock/cobv/:txid/pagamento`, com `valor`, `infoPagador` e `pagador` opcionais. Gera `endToEndId` (`E` + ISPB + data/hora + aleatório, 32 caracteres; ISPB configurável por `PIX_ISPB`), muda a cobrança para `CONCLUIDA` e preenche `pix[]`. São rejeitados: cobrança que não está `ATIVA`, Cob expirada (`criacao + expiracao`), CobV fora de `dataDeVencimento + validadeAposVencimento` e valor diferente do original quando `modalidadeAlteracao` não é 1.
+- **Pix recebidos:** `GET /pix/:e2eid` e `GET /pix`. A listagem exige `inicio`/`fim` e aceita os filtros `txid`, `txIdPresente`, `devolucaoPresente` e `cpf`/`cnpj` (do pagador), além de paginação.
+- **Devolução:** `PUT /pix/:e2eid/devolucao/:id` (201) e `GET`. Valida o pattern do `id`, impede `id` duplicado, impede que a soma das devoluções passe do valor do Pix e só aceita `RETIRADA` em Pix Saque/Troco. Gera `rtrId` e devolve o status `DEVOLVIDO`.
+- **Webhooks:** `PUT`/`GET`/`DELETE /webhook/:chave` e `GET /webhook` (paginado). Também `PUT`/`GET`/`DELETE` em `/webhookcob`, `/webhookcobv`, `/webhookcobr` e `/webhookrec`. A cada pagamento ou devolução, o mock faz `POST {webhookUrl}/pix` com `{ "pix": [...] }`. O timeout é configurável por `WEBHOOK_TIMEOUT_MS`, e o histórico de entregas fica em `GET /mock/webhooks/entregas`. Por ser um mock, `http://` é aceito.
+- **Payload Location:** `GET /mock/qr/:uuid` responde um JWS RS256 (`application/jose`) com o payload da Cob/CobV. A chave pública é publicada em `GET /mock/jwks`, referenciada pelo `jku`. Para o `location` das cobranças apontar para o mock, use `PIX_LOCATION_HOST=localhost:3000/mock/qr`.
+- O interceptor responde 404 para qualquer operação sem resultado (antes, só GET, PATCH e DELETE).
+
+Evidências:
+- `test/pix.e2e.test.ts`: 9 cenários. Inclui um receptor HTTP real para o webhook e a verificação da assinatura JWS com o JWKS.
+- `npx jest --coverage=false`: 17 suítes e 278 testes passando. Lint, Prettier e build: OK.
+- Smoke no servidor real: PUT cob → 201; Payload Location → 200 `application/jose`; pagamento → 201; `GET /pix` → 200; devolução → 201; cob → `CONCLUIDA`, com a devolução visível em `pix[0]`.
 

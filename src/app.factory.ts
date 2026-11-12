@@ -20,6 +20,9 @@ export const COLLECTIONS: { [name: string]: string[] } = {
   LOCATIONS: ['id', 'uuid'],
   LOC_COB: ['id', 'txid'],
   REC: ['idRec'],
+  PIX: ['endToEndId'],
+  WEBHOOKS: ['chave'],
+  WEBHOOKS_TIPO: ['tipo'],
 };
 
 export async function initDatabase(): Promise<void> {

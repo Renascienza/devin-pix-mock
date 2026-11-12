@@ -93,6 +93,25 @@ export class HttpInterceptor implements NestInterceptor {
     },
     rec: { prefix: 'Rec', detail: 'A recorrência não respeita o schema.' },
     cobr: { prefix: 'CobR', detail: 'A cobrança não respeita o schema.' },
+    pix: { prefix: 'Pix', detail: 'A requisição não respeita o schema.' },
+    webhook: { prefix: 'Webhook', detail: 'O webhook não respeita o schema.' },
+    webhookcob: {
+      prefix: 'Webhook',
+      detail: 'O webhook não respeita o schema.',
+    },
+    webhookcobv: {
+      prefix: 'Webhook',
+      detail: 'O webhook não respeita o schema.',
+    },
+    webhookcobr: {
+      prefix: 'Webhook',
+      detail: 'O webhook não respeita o schema.',
+    },
+    webhookrec: {
+      prefix: 'Webhook',
+      detail: 'O webhook não respeita o schema.',
+    },
+    mock: { prefix: 'Cob', detail: 'A requisição não respeita o schema.' },
   };
 
   private toViolations(
@@ -192,12 +211,7 @@ export class HttpInterceptor implements NestInterceptor {
 
       return next.handle().pipe(
         tap((res) => {
-          if (
-            (request.method === 'GET' ||
-              request.method === 'PATCH' ||
-              request.method === 'DELETE') &&
-            !res
-          ) {
+          if (!res) {
             throw new NotFoundException();
           } else {
             return res;

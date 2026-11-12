@@ -61,6 +61,17 @@ export class MemoryDB {
     }
   };
 
+  async find(
+    predicate: (item: any) => boolean,
+  ): Promise<{ clusterKey: string; item: any } | undefined> {
+    for (const [clusterKey, items] of Object.entries(this.cluster)) {
+      const item = (items as any[]).find(predicate);
+      if (item) {
+        return { clusterKey, item };
+      }
+    }
+  }
+
   async read(clusterKey: string, sortKey: { [name: string]: string | number }) {
     const keys = Object.keys(sortKey);
     this.skCompare(keys);

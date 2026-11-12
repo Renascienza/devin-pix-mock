@@ -18,6 +18,22 @@ export class TxidPipe implements PipeTransform<string, string> {
   }
 }
 
+export class PatternPipe implements PipeTransform<string, string> {
+  constructor(
+    private readonly campo: string,
+    private readonly pattern: RegExp,
+  ) {}
+
+  transform(value: string): string {
+    if (!this.pattern.test(value || '')) {
+      throw new BadRequestException({
+        [this.campo]: 'O campo $$ não respeita o schema.',
+      });
+    }
+    return value;
+  }
+}
+
 export class RevisaoPipe implements PipeTransform<string, number> {
   transform(value: string): number {
     if (value === undefined || value === '') {
