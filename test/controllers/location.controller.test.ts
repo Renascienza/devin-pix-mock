@@ -88,7 +88,7 @@ describe('LocationController', () => {
         describe('200', () => {
             it('txid', async () => {
                 const cob = await ctrlCob.add({ valor: { original: "10.00" }, chave }, randomUUID().replace(/\-/g, ''), { IdOwner });
-                ctrl.remove({ id: cob.loc.id }, { IdOwner })
+                await ctrl.remove({ id: cob.loc.id }, { IdOwner });
                 const loc = await ctrl.read({ id: cob.loc.id }, { IdOwner });
                 expect(loc.txid).toBeUndefined();
             });

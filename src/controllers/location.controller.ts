@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, UseInterceptors } from "@nestjs/common";
-import { LocGetResponse, LocGetFilter, LocPutRequest } from "../../src/core/app/models/loc";
-import { PSP } from "../../src/core/app/psp";
-import { HttpInterceptor } from "../../src/http.interceptor";
+import { LocGetResponse, LocGetFilter, LocPutRequest } from "../core/app/models/loc";
+import { PSP } from "../core/app/psp";
+import { HttpInterceptor } from "../http.interceptor";
 
 @Controller("loc")
 @UseInterceptors(HttpInterceptor)

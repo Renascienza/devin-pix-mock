@@ -21,6 +21,10 @@ export class MemoryDB {
 
     }
 
+    public static ensure(collectionName: string, sortKeys: string[]): MemoryDB {
+        return MemoryDB.collections[collectionName] || MemoryDB.create(collectionName, sortKeys);
+    }
+
     public static get(collectionName: string): MemoryDB {
         return MemoryDB.collections[collectionName];
     }

@@ -45,10 +45,5 @@ export class CobController {
     return this.pspService.editCob(itm);
   }
 
-  @Get(":txid")
-  remove(@Param("txid") txid, @Headers() headers) {
-    const IdOwner = headers["IdOwner"];
-    return this.pspService.removeCob({ IdOwner, txid });
-  }
 
 }

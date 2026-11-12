@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNotEmptyObject, IsNumberString, ValidateNested } from "class-validator"
+import { IsDefined, IsNotEmpty, IsNotEmptyObject, IsNumberString, ValidateNested } from "class-validator"
 import { Chave, ICriacao, ValidadeVencimento, IInfoAdicional, Pessoa, PixID, ModalidadeAlteracao, Situacao, PixRevisao, IJuros, IDesconto, IMulta } from "../models"
 import { Type } from "class-transformer"
 import { IntersectionType } from '@nestjs/swagger';
@@ -47,18 +47,22 @@ export class CobVValor extends IntersectionType(Valor, Alteracao, Retirada)
 }
 
 export class CobVPutRequest {
+    @IsDefined({ message: 'O campo $$ não respeita o schema.' })
     @IsNotEmpty({ message: 'O campo $$ não respeita o schema.' })
     @IsDICTValid({ message: 'O campo $$ não respeita o schema.' })
     @IsDICTExists({ message: 'O campo $$ corresponde a uma conta que não pertence a este usuário recebedor.' })
     chave?: string
 
+    @IsDefined({ message: 'O campo $$ não respeita o schema.' })
     @IsNotEmptyObject({ nullable: false }, { message: 'O campo $$ não respeita o schema.' })
     @ValidateNested({})
     @Type(() => CobVValor)
     valor: CobVValor
+    @IsDefined({ message: 'O campo $$ não respeita o schema.' })
     @ValidateNested({})
     @Type(() => ValidadeVencimento)
     calendario?: ValidadeVencimento
+    @IsDefined({ message: 'O campo $$ não respeita o schema.' })
     @ValidateNested()
     @Type(() => Pessoa)
     devedor?: Pessoa

@@ -1,6 +1,6 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor, HttpException, UnauthorizedException, InternalServerErrorException, BadRequestException, NotFoundException } from "@nestjs/common";
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor, HttpException, UnauthorizedException, InternalServerErrorException, BadRequestException, NotFoundException, ForbiddenException, ServiceUnavailableException } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import { catchError, Observable, tap } from "rxjs";
+import { catchError, Observable, tap, throwError } from "rxjs";
 import { owners } from './data/db.json'
 
 
@@ -28,6 +28,56 @@ export class HttpInterceptor implements NestInterceptor {
         503: () => (this.handleError(`https://pix.bcb.gov.br/api/v2/error/ServicoIndisponivel`, 'Serviço Indisponível', `Serviço não está disponível no momento. Serviço solicitado pode estar em manutenção ou fora da janela de funcionamento.`, 503, [])),
     }
 
+    private static resources: { [endpoint: string]: { prefix: string, detail: string } } = {
+        cob: { prefix: 'Cob', detail: 'A cobrança não respeita o schema.' },
+        cobv: { prefix: 'CobV', detail: 'A cobrança não respeita o schema.' },
+        loc: { prefix: 'PayloadLocation', detail: 'O Location não respeita o schema.' },
+        rec: { prefix: 'Rec', detail: 'A recorrência não respeita o schema.' },
+        cobr: { prefix: 'CobR', detail: 'A cobrança não respeita o schema.' },
+    }
+
+    private toViolations(endpoint: string, response: any): { razao: string, propriedade: string }[] {
+        if (typeof response === 'string') {
+            return [{ propriedade: endpoint, razao: response }];
+        }
+        if (Array.isArray(response?.message)) {
+            return response.message.map((m: string) => ({ propriedade: endpoint, razao: String(m) }));
+        }
+        if (typeof response?.message === 'string') {
+            return [{ propriedade: endpoint, razao: response.message }];
+        }
+        return Object.keys(response || {}).map((key: string) => ({
+            propriedade: `${endpoint}.${key}`,
+            razao: String(response[key]).replace('$$', `${endpoint}.${key}`)
+        }));
+    }
+
+    private toProblem(err: any, request: any): HttpException {
+        const endpoint = String(request.url || '').split('?')[0].split('/')[1] || '';
+        const resource = HttpInterceptor.resources[endpoint] || { prefix: 'Cob', detail: 'A requisição não respeita o schema.' };
+        const badRequest = (violacoes: { razao: string, propriedade: string }[]) =>
+            new BadRequestException(this.ServerErrorTypes[400](resource.prefix, resource.detail, violacoes));
+
+        if (err instanceof HttpException) {
+            const response: any = err.getResponse();
+            if (response?.type && response?.status) {
+                return err;
+            }
+            switch (err.getStatus()) {
+                case 400: return badRequest(this.toViolations(endpoint, response));
+                case 401: return new UnauthorizedException(this.ServerErrorTypes[401]());
+                case 403: return new ForbiddenException(this.ServerErrorTypes[403]('Requisição de participante autenticado que viola alguma regra de autorização.', []));
+                case 404: return new NotFoundException(this.ServerErrorTypes[404]());
+                case 503: return new ServiceUnavailableException(this.ServerErrorTypes[503]());
+            }
+        }
+        else if (err instanceof Error && !(err instanceof TypeError || err instanceof ReferenceError || err instanceof RangeError || err instanceof SyntaxError)) {
+            return badRequest([{ propriedade: endpoint, razao: err.message }]);
+        }
+        console.error(err);
+        return new InternalServerErrorException({ type: 'https://pix.bcb.gov.br/api/v2/error/ErroInternoDoServidor', title: 'Erro Interno do Servidor', status: 500, detail: 'Erro inesperado no servidor.', violacoes: [] });
+    }
+
     intercept(context: ExecutionContext, next: CallHandler): Observable<void> {
         const request = context.switchToHttp().getRequest();
         const token = request.headers['mocked-token'];
@@ -46,57 +96,13 @@ export class HttpInterceptor implements NestInterceptor {
                         return res;
                     }
                 }),
-                catchError((err: HttpException): Observable<any> => {
-                    const statusHandle = {
-                        400: () => {
-                            const endpoint = request['url'].split('/')[1];
-
-                            const handle: (msgs: any) => Observable<any> = {
-                                'cob': (msgs: { [key: string]: string }) => {
-                                    const violacoes = Object.keys(msgs).map((key: string) => ({ propriedade: `${endpoint}.${key}`, razao: msgs[key].replace('$$', `${endpoint}.${key}`) }));
-                                    throw new BadRequestException(this.ServerErrorTypes[err.getStatus()]('Cob', "A cobrança não respeita o schema.", violacoes));
-                                },
-                                'cobv': (msgs: { [key: string]: string }) => {
-                                    const violacoes = Object.keys(msgs).map((key: string) => ({ propriedade: `${endpoint}.${key}`, razao: msgs[key].replace('$$', `${endpoint}.${key}`) }));
-                                    throw new BadRequestException(this.ServerErrorTypes[err.getStatus()]('CobV', "A cobrança não respeita o schema.", violacoes));
-                                },
-                                'loc': (msgs: { [key: string]: string }) => {
-                                    const violacoes = Object.keys(msgs).map((key: string) => ({ propriedade: `${endpoint}.${key}`, razao: msgs[key].replace('$$', `${endpoint}.${key}`) }));
-                                    throw new BadRequestException(this.ServerErrorTypes[err.getStatus()]('Location', "O Location não respeita o schema.", violacoes));
-                                },
-
-                                'rec': (msgs: { [key: string]: string }) => {
-                                    const violacoes = Object.keys(msgs).map((key: string) => ({ propriedade: `${endpoint}.${key}`, razao: msgs[key].replace('$$', `${endpoint}.${key}`) }));
-                                    throw new BadRequestException(this.ServerErrorTypes[err.getStatus()]('Rec', "A recorrência não respeita o schema.", violacoes));
-                                },
-                                
-                            }[endpoint];
-
-                            //console.log(err.getResponse().valueOf())
-                            return handle(err.getResponse().valueOf()); //return handle(JSON.parse(err.getResponse().valueOf()['message']));
-                        },
-                        404: () => {
-                            throw new NotFoundException(this.ServerErrorTypes[err.getStatus()]())
-                        },
-                        500: () => {
-                            console.log( err );
-                            throw new InternalServerErrorException(
-                                this.ServerErrorTypes[err.getStatus?.() || 500]
-                            )
-                        }
-                    }[err.getStatus?.() || 500]
-
-                    return statusHandle();
-
-
+                catchError((err: any): Observable<any> => {
+                    throw this.toProblem(err, request);
                 })
             );
         }
         else {
-            return new Observable<any>((subs) => {
-
-                throw new UnauthorizedException(this.ServerErrorTypes[401]())
-            });
+            return throwError(() => new UnauthorizedException(this.ServerErrorTypes[401]()));
 
         }
     }

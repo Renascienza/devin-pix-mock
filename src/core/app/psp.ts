@@ -85,6 +85,10 @@ export class PSP {
 
         const curr = { ...itm.data, txid: itm.txid, revisao: 0, status: Situacao.Ativa, criacao: (new Date()).toJSON() };
 
+        if (await this.cob.read(itm.IdOwner, { txid: itm.txid })) {
+            throw new Error(`O campo txid ${itm.txid} já está em uso.`);
+        }
+
         //INCLUI  LOCATION E TRANSAÇÃO, PARA DEPOIS VINCULÁ-LAS  
         const { id } = await this.addLoc({ tipoCob, IdOwner: itm.IdOwner })
         await this.cob.add(itm.IdOwner, curr);
@@ -221,10 +225,10 @@ export class PSP {
                 const lc = await this.loccob.read(itm.IdOwner, { txid: itm.txid });
 
                 if (lc?.id != itm.data.loc.id) {
-                    await this.loccob.remove(itm.IdOwner, { id: lc.id });
+                    if (lc) { await this.loccob.remove(itm.IdOwner, { id: lc.id }); }
                     try { await this.joinLocCob(itm.IdOwner, itm.txid, itm.data.loc.id, tipoCob); }
                     catch (ex) {
-                        await this.loccob.add(itm.IdOwner, { id: lc.id }); //desfaz a exclusão
+                        if (lc) { await this.loccob.add(itm.IdOwner, { id: lc.id, txid: itm.txid }); } //desfaz a exclusão
                         throw ex;
                     }
                 }
@@ -243,22 +247,13 @@ export class PSP {
                 if (tipoCob === TipoCob.vencimento && itm.data.valor) {
                     const valor = itm.data.valor as CobVValor;
                     const currV = curr.valor as CobVValor;
+                    const merged = (a?: object, b?: object) => (a || b) ? { ...(a || {}), ...(b || {}) } : undefined;
                     itm.data.valor = {
                         ...itm.data.valor,
-                        desconto: {
-                            data: valor.desconto?.data || currV.desconto.data,
-                            modalidade: valor.desconto?.modalidade || currV.desconto.modalidade,
-                            valorPerc: valor.desconto?.valorPerc || currV.desconto.valorPerc
-                        },
-                        juros: {
-                            modalidade: valor.juros?.modalidade || currV.juros.modalidade,
-                            valorPerc: valor.juros?.valorPerc || currV.juros.valorPerc
-                        },
-                        multa: {
-                            modalidade: valor.multa?.modalidade || currV.multa.modalidade,
-                            valorPerc: valor.multa?.valorPerc || currV.multa.valorPerc
-                        }
-                    }
+                        desconto: merged(currV?.desconto, valor.desconto),
+                        juros: merged(currV?.juros, valor.juros),
+                        multa: merged(currV?.multa, valor.multa)
+                    } as CobVValor;
                 }
 
                 await this.cob.update(itm.IdOwner, { txid: itm.txid }, { ...curr, ...itm.data });
@@ -366,8 +361,12 @@ export class PSP {
         return await this.readLoc({ IdOwner, id });
     }
 
-    async removeLoc({ id, IdOwner }: LocID & { IdOwner: string }): Promise<boolean> {
-        return await this.loccob.remove(IdOwner, { id });
+    async removeLoc({ id, IdOwner }: LocID & { IdOwner: string }): Promise<LocGetResponse> {
+        const loc = await this.readLoc({ IdOwner, id });
+        if (!loc) { return undefined; }
+        if (loc.txid) { await this.loccob.remove(IdOwner, { id }); }
+        const { txid, ...unlinked } = loc;
+        return unlinked as LocGetResponse;
     }
 
     async addRec(mdl: RecRequest<RecPostRequest>) {

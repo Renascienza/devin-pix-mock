@@ -76,15 +76,6 @@ describe('CobController', () => {
     });
   })
 
-  describe('REMOVE', () => {
-    it('success', async () => {
-      await ctrl.add({ chave, valor: { original: "1.00" } }, txid, { IdOwner });
-      await expect(ctrl.remove(txid, { IdOwner })).resolves.toBeTruthy();
-      await expect(ctrl.read(txid, { IdOwner })).resolves.toBeUndefined();
-    });
-
-
-  })
 
   describe("LIST", () => {
     const FILL_TEST = 11

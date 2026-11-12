@@ -6,6 +6,8 @@ import { randomUUID } from 'crypto';
 import { MemoryDB } from '../src/libs/fakedb';
 import { correntistas } from '../src/data/db.json'
 import { gerarCNPJ } from '../src/libs/documentos';
+
+const devedor = { nome: 'Fulano de Tal', cnpj: gerarCNPJ() };
 import { ModalidadeDesconto, ModalidadeJurosDiasCorridos, ModalidadeMulta, ValidadeVencimento } from '../src/core/app/models';
 import { addDays } from '../src/libs/utils';
 import { CobVValor } from 'src/core/app/models/cobv';
@@ -85,7 +87,7 @@ describe('COBV', () => {
         calendario.dataDeVencimento = addDays(new Date(), -1).toJSON();
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(400)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 400, detail: "A cobrança não respeita o schema.", violacoes: [{ razao: "O campo cobv.calendario.dataDeVencimento é anterior à data de criação da cobrança.", propriedade: "cobv.calendario.dataDeVencimento" }] }));
@@ -95,7 +97,7 @@ describe('COBV', () => {
         valor.original = "abc123";
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(400)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 400, detail: "A cobrança não respeita o schema.", violacoes: [{ razao: "O campo cobv.valor.original não respeita o schema.", propriedade: "cobv.valor.original" }] }));
@@ -104,7 +106,7 @@ describe('COBV', () => {
       it('O campo cobv.valor.original é zero.', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave, valor: { original: "0.00" } })
+          .send({ chave, valor: { original: "0.00" }, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(400)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 400, detail: "A cobrança não respeita o schema.", violacoes: [{ razao: "O campo cobv.valor.original é zero.", propriedade: "cobv.valor.original" }] }));
@@ -113,7 +115,7 @@ describe('COBV', () => {
       it('O campo cobv.chave não respeita o schema.', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave: `${chave}a`, valor: { original: "1.00" } })
+          .send({ chave: `${chave}a`, valor: { original: "1.00" }, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(400)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 400 }));
@@ -122,7 +124,7 @@ describe('COBV', () => {
       it('O campo cobv.chave corresponde a uma conta que não pertence a este usuário recebedor.', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave: gerarCNPJ(), valor: { original: "1.00" } })
+          .send({ chave: gerarCNPJ(), valor: { original: "1.00" }, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(400)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 400, detail: "A cobrança não respeita o schema.", violacoes: [{ razao: "O campo cobv.chave corresponde a uma conta que não pertence a este usuário recebedor.", propriedade: "cobv.chave" }] }));
@@ -136,7 +138,7 @@ describe('COBV', () => {
       it('Sem cabeçalho', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID()}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .expect(401)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 401 }));
       });
@@ -144,7 +146,7 @@ describe('COBV', () => {
       it('Cabeçalho inválido', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID()}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "xpto")
           .expect(401)
           .expect((res) => expect(JSON.parse(res.text)).toMatchObject({ status: 401 }));
@@ -158,7 +160,7 @@ describe('COBV', () => {
       it('Preenchimento válido', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${randomUUID().replace(/\-/g, '')}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(200)
           .expect((res: any) => expect(JSON.parse(res.text)).toMatchObject({ chave, valor, calendario }))
@@ -204,7 +206,7 @@ describe('COBV', () => {
       it('Preenchimento mínimo', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${txid}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(200);
 
@@ -218,7 +220,7 @@ describe('COBV', () => {
       it('Versões anteriores', async () => {
         await request(app.getHttpServer())
           .put(`/cobv/${txid}`)
-          .send({ chave, valor, calendario })
+          .send({ chave, valor, calendario, devedor })
           .set("mocked-token", "123-abc")
           .expect(200);
 
@@ -262,7 +264,7 @@ describe('COBV', () => {
     beforeEach(async () => {
       await request(app.getHttpServer())
         .put(`/cobv/${txid}`)
-        .send({ chave, valor, calendario })
+        .send({ chave, valor, calendario, devedor })
         .set("mocked-token", "123-abc")
         .expect(200);
     })

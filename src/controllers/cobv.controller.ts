@@ -36,9 +36,4 @@ export class CobVController {
     return this.pspService.editCobV(itm);
   }
 
-  @Get(":txid")
-  remove(@Param("txid") txid, @Headers() headers) {
-    const IdOwner = headers["IdOwner"];
-    return this.pspService.removeCobV({ IdOwner, txid });
-  }
 }
