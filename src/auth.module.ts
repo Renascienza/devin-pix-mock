@@ -7,6 +7,4 @@ import { Auth } from './core/auth/auth';
   controllers: [AuthController],
   providers: [Auth],
 })
-export class AuthModule {
-    
-}
+export class AuthModule {}

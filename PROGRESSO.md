@@ -18,8 +18,8 @@ Referências: *Discovery — devin-pix-mock* e *Análise de aderência à especi
 | Gate | Tema | Status |
 |---|---|---|
 | G0 | Estabilização | Concluído |
-| G1 | CI e higiene | Em andamento |
-| G2 | Conformidade Cob/CobV/Loc | Pendente |
+| G1 | CI e higiene | Concluído |
+| G2 | Conformidade Cob/CobV/Loc | Em andamento |
 | G3 | Pagamento, Pix, devolução, webhooks, payload location | Pendente |
 | G4 | Pix Automático (Rec, SolicRec, LocRec, CobR) e LoteCobV | Pendente |
 | G5 | Operação e DX | Pendente |
@@ -50,4 +50,23 @@ Objetivo: fazer o que já existe funcionar no servidor real (`npm start`), sem 5
 **Evidências G0:** `npx jest` 15 suítes / 258 testes passando; `nest build` ok; `docker build` ok e container responde; servidor real (`node dist/main.js`) testado com curl: PUT/POST cob → 200/201, txid repetido → 400, sem `chave` → 400, devedor CPF → 200, CobV completa → 200, CobV sem devedor/calendario → 400, listagens cob/loc → 200, auth inválida → 401, grant inválido → 400.
 
 **Fica para G2:** status 201 nos PUT, OAuth2 Bearer, `correlationId`, patterns de `txid`/valores, paginação, coleção separada para CobV.
+
+### G1 — CI e higiene
+
+| Item | Antes | Depois |
+|---|---|---|
+| NestJS | 10.x (vulnerável em `@nestjs/core`, `multer`, `body-parser`) | **11.x** (`common`, `core`, `platform-express`, `swagger`, `testing`, `cli`, `schematics`) |
+| `npm audit` (produção) | 16 (1 crítica, 10 altas) | **0** |
+| `npm audit` (total) | 49 (2 críticas, 20 altas) | 17 (1 alta, só em ferramentas de dev) |
+| ESLint | 2.960 erros | **0** (`npm run lint:check`, `--max-warnings=0`) |
+| Prettier | código fora do padrão | todo `src/` e `test/` formatado (`npm run format:check`) |
+| CI | inexistente | `.github/workflows/ci.yml`: `npm ci` → lint → build → testes → `npm audit --omit=dev --audit-level=high` + job de `docker build` |
+
+Outros ajustes:
+- O script `lint` deixa de usar `--fix` implicitamente. Foram criados `lint:check`, `lint:fix` e `format:check`, e o `package.json` declara `engines.node >=20`.
+- Removido `src/controllers/fakedb.ts`, uma cópia divergente e não usada de `src/libs/fakedb.ts`.
+- Removidos imports e variáveis sem uso. Em `.eslintrc.js`, `no-unused-vars` passa a aceitar o prefixo `_` e fica desligado nos testes.
+- `CobRController.create` passa a delegar para `PSP.addCobR` (a implementação real vem no G4).
+
+**Evidências G1:** lint sem problemas, format ok, build ok, 258 testes passando com Nest 11; smoke no servidor real (POST /cob 201, listagem 200, /api-docs 200).
 

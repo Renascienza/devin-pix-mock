@@ -2,26 +2,24 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PSP } from '../../src/core/app/psp';
 import { randomUUID } from 'crypto';
 import { MemoryDB } from '../../src/libs/fakedb';
-import { correntistas } from '../../src/data/db.json'
+import { correntistas } from '../../src/data/db.json';
 import { CobRController } from '../../src/controllers/cobr.controller';
 
 describe('CobRController', () => {
   let ctrl: CobRController;
 
-
   beforeAll(async () => {
-    const cst = MemoryDB.create("CORRENTISTAS", ['chave', 'cpfcnpj']);
+    const cst = MemoryDB.create('CORRENTISTAS', ['chave', 'cpfcnpj']);
 
-    MemoryDB.create("COB", ['txid']);
-    MemoryDB.create("COB_HIST", ['id']);
+    MemoryDB.create('COB', ['txid']);
+    MemoryDB.create('COB_HIST', ['id']);
 
-    MemoryDB.create("COBR", ['txid']);
+    MemoryDB.create('COBR', ['txid']);
 
+    MemoryDB.create('LOCATIONS', ['id', 'uuid']);
+    MemoryDB.create('LOC_COB', ['id', 'txid']);
 
-    MemoryDB.create("LOCATIONS", ['id', 'uuid']);
-    MemoryDB.create("LOC_COB", ['id', 'txid']);
-
-    await Promise.all(correntistas.map(c => cst.add('DEV', c)));
+    await Promise.all(correntistas.map((c) => cst.add('DEV', c)));
 
     const app: TestingModule = await Test.createTestingModule({
       controllers: [CobRController],
@@ -37,14 +35,13 @@ describe('CobRController', () => {
     IdOwner = randomUUID();
   });
 
-  it('CHECK', ()=>{
+  it('CHECK', () => {
     expect(1).toBe(1);
-  })
+  });
 
   // describe('CREATE', () => {
   //   it('Success', async () => await expect(ctrl.create({ chave, valor: { original: "10.00" } }, { IdOwner })).resolves.toMatchObject({ chave, loc: { tipoCob: TipoCob.imediato } }));
   // });
-
 
   // describe('EDIT', () => {
   //   it('success', async () => {
@@ -67,7 +64,6 @@ describe('CobRController', () => {
   //     await expect(ctrl.remove(txid, { IdOwner })).resolves.toBeTruthy();
   //     await expect(ctrl.read(txid, { IdOwner })).resolves.toBeUndefined();
   //   });
-
 
   // })
 
@@ -159,7 +155,6 @@ describe('CobRController', () => {
 
   //   describe('PAGINAÇÃO', () => {
   //     let filter: CobGetFilter = { inicio: flatDate(addDays(new Date(), -1)).toJSON(), fim: flatDate(addDays(new Date(), +1)).toJSON() };
-
 
   //     it('pag:1 | Tam: 5 | 5 itens', async () => {
   //       filter.paginacao = { itensPorPagina: 5, paginaAtual: 1 }

@@ -82,7 +82,6 @@
 
 //     vencimento: (name: string, v: IVencimento, cobranca: Date) => {
 
-
 //         if (VALIDATORS.greaterEqual(name, +new Date(v?.dataDeVencimento), +flatDate(cobranca))) {
 //             return {
 //                 propriedade: name,
@@ -96,7 +95,6 @@
 //             }
 //         }
 //     },
-
 
 //     retirada: async (name: string, v: Retirada) => {
 //         if (v.retirada) {
@@ -120,7 +118,6 @@
 //         }
 
 //     },
-
 
 //     multa: (name: string, v: IValorCobV) => {
 //         if (v.multa) {

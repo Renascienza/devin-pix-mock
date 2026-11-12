@@ -7,9 +7,12 @@ import { RecController } from './controllers/rec.controller';
 
 @Module({
   imports: [],
-  controllers: [CobController, CobVController, LocationController,RecController],
+  controllers: [
+    CobController,
+    CobVController,
+    LocationController,
+    RecController,
+  ],
   providers: [PSP],
 })
-export class AppModule {
-
-}
+export class AppModule {}
