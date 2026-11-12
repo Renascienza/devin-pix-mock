@@ -1,22 +1,16 @@
-FROM node:20 AS base
-RUN npm i -g @nestjs/cli 
-
-FROM base AS init
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package.json .
-RUN npm i
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
 
-FROM init AS build
-COPY tsconfig.build.json .
-COPY tsconfig.json .
-COPY nest-cli.json .
-COPY jest.config.ts .
-COPY src/ .
-RUN yarn build
-
-FROM node:20.16.0-alpine AS final
+FROM node:20-alpine AS final
 WORKDIR /app
-COPY --from=init /app/node_modules/ ./node_modules/
-COPY --from=build /app/dist/ .
+ENV NODE_ENV=production
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 EXPOSE 3000 3001
-ENTRYPOINT ["node", "main.js"]
+CMD ["node", "dist/main.js"]
